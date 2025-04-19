@@ -4,12 +4,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { fetchUserData } from "@/server/fetchData";
 import { Button } from "@/components/ui/button";
 import { Flame } from "lucide-react";
+import { signOut } from "@/server/auth/actions";
+
+// Define a type for the user (you may already have this defined elsewhere)
+type User = {
+  email?: string;
+  // Add other user properties as needed
+};
 
 export function Navbar() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -25,6 +35,26 @@ export function Navbar() {
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
+  }, []);
+
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      try {
+        const userData = await fetchUserData();
+        if (userData && userData.user) {
+          setIsLoggedIn(true);
+          setUser(userData.user);
+        } else {
+          setIsLoggedIn(false);
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Error checking login status:", error);
+        setIsLoggedIn(false);
+      }
+    };
+
+    checkLoginStatus();
   }, []);
 
   return (
@@ -76,15 +106,35 @@ export function Navbar() {
           </Link>
         </nav>
         <div className="flex items-center gap-4">
-          <Link href="/login">
-            <Button
-              variant="outline"
-              className="border-red-500/30 text-white hover:bg-red-500/10 hover:text-red-400 transition-all duration-300"
-              size="sm"
-            >
-              Log In
-            </Button>
-          </Link>
+          {isLoggedIn ? (
+            <>
+              <span className="text-sm text-muted-foreground hidden md:inline-block">
+                {user?.email?.split('@')[0] || 'User'}
+              </span>
+              <Button
+                variant="outline"
+                className="border-red-500/30 text-white hover:bg-red-500/10 hover:text-red-400 transition-all duration-300"
+                size="sm"
+                onClick={async () => {
+                  await signOut();
+                  setIsLoggedIn(false);
+                }}
+              >
+                Log Out
+                
+              </Button>
+            </>
+          ) : (
+            <Link href="/login">
+              <Button
+                variant="outline"
+                className="border-red-500/30 text-white hover:bg-red-500/10 hover:text-red-400 transition-all duration-300"
+                size="sm"
+              >
+                Log In
+              </Button>
+            </Link>
+          )}
           <Link href="/upload">
             <Button
               className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg shadow-red-500/20 transition-all duration-300 hover:shadow-red-500/40"

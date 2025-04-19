@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Sparkles, ArrowRight, Mail } from "lucide-react"
+import { Flame, ArrowRight } from "lucide-react"
 import { signInWithEmail, signInWithGoogle } from "@/server/auth/actions"
 import Link from "next/link"
 
@@ -16,20 +16,23 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1A1A1A] flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
       {/* Logo and header */}
       <div className="mb-8 text-center">
         <Link href="/">
-          <h1 className="text-3xl font-semibold text-gray-200 mb-2">Graphis</h1>
+          <div className="flex items-center justify-center space-x-2">
+            <Flame className="h-8 w-8 text-red-500" />
+            <h1 className="text-3xl font-semibold font-bold bg-gradient-to-r from-red-500 to-red-700 bg-clip-text text-transparent">Firewatch</h1>
+          </div>
         </Link>
-        <div className="flex items-center justify-center gap-2">
-          <Sparkles className="h-5 w-5 text-purple-400" />
-          <p className="text-gray-400 text-sm">AI-powered assistant</p>
+        <div className="flex items-center justify-center gap-2 mt-2">
+          <Flame className="h-4 w-4 text-red-400" />
+          <p className="text-gray-400 text-sm">Fire prevention & safety assistant</p>
         </div>
       </div>
 
       {/* Login card */}
-      <div className="w-full max-w-md bg-[#2A2A2A] rounded-lg border border-gray-700 p-6 shadow-xl">
+      <div className="w-full max-w-md bg-zinc-900 rounded-lg border border-red-900/30 p-6 shadow-xl">
         <h2 className="text-xl font-medium text-gray-200 mb-6">Welcome back</h2>
 
         {loginError && (
@@ -68,10 +71,10 @@ export default function LoginPage() {
 
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-600"></div>
+            <div className="w-full border-t border-gray-700"></div>
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-[#2A2A2A] px-2 text-gray-400">Or continue with</span>
+            <span className="bg-zinc-900 px-2 text-gray-400">Or continue with</span>
           </div>
         </div>
 
@@ -85,7 +88,7 @@ export default function LoginPage() {
               name="email"
               type="email"
               required
-              className="w-full px-3 py-2 bg-[#333333] border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-zinc-800 border border-red-900/30 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
               placeholder="you@example.com"
             />
           </div>
@@ -99,7 +102,7 @@ export default function LoginPage() {
               name="password"
               type="password"
               required
-              className="w-full px-3 py-2 bg-[#333333] border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-zinc-800 border border-red-900/30 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
               placeholder="••••••••"
             />
           </div>
@@ -107,7 +110,7 @@ export default function LoginPage() {
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-md flex items-center justify-center gap-2 transition-colors"
+              className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-medium py-2 px-4 rounded-md flex items-center justify-center gap-2 transition-colors shadow-lg shadow-red-500/20 hover:shadow-red-500/40"
             >
               Sign in
               <ArrowRight className="h-4 w-4" />
@@ -120,7 +123,7 @@ export default function LoginPage() {
             Don't have an account?
             <Link
               href="/register"
-              className="ml-2 text-purple-400 hover:text-purple-300 focus:outline-none"
+              className="ml-2 text-red-400 hover:text-red-300 focus:outline-none"
             >
               Sign up
             </Link>
@@ -131,7 +134,7 @@ export default function LoginPage() {
       {/* Footer */}
       <div className="mt-8 text-center">
         <p className="text-xs text-gray-500">
-          By continuing, you agree to Graphis's{" "}
+          By continuing, you agree to Firewatch's{" "}
           <Link href="#" className="text-gray-400 hover:text-gray-300">
             Terms of Service
           </Link>{" "}
