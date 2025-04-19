@@ -42,8 +42,10 @@ export function Navbar() {
       try {
         const userData = await fetchUserData();
         if (userData && userData.user) {
-          setIsLoggedIn(true);
+          console.log("User data:", userData.user.email);
           setUser(userData.user);
+          setIsLoggedIn(true);
+         
         } else {
           setIsLoggedIn(false);
           setUser(null);
