@@ -34,7 +34,8 @@ seen = []
 async def receive_data(
     frame_number: int = Form(...),
     timestamp: float = Form(...),
-    user_uuid: str = Form(...),  
+    user_uuid: str = Form(...), 
+    user_email: str = Form(...), 
     image_data: UploadFile = File(...)
 ):
     # Get file content
@@ -49,6 +50,7 @@ async def receive_data(
         "message": "Frame received", 
         "frame": frame_number,
         "user_uuid": user_uuid,
+        "user_email": user_email,
         "fire_detected": fire_detected,
         "confidence_score": confidence_score
     }
