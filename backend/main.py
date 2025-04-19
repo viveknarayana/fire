@@ -1,7 +1,18 @@
 import os
+import random
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
+import supabase
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env.local'))
+
+# Initialize Supabase client
+supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+supabase_key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+supabase_client = supabase.create_client(supabase_url, supabase_key)
 
 app = FastAPI()
 
@@ -23,29 +34,48 @@ seen = []
 async def receive_data(
     frame_number: int = Form(...),
     timestamp: float = Form(...),
+    user_uuid: str = Form(...),  
     image_data: UploadFile = File(...)
 ):
     # Get file content
     file_content = await image_data.read()
     file_size = len(file_content)
     
-    # Generate a unique filename using timestamp and frame number
-    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"frame_{frame_number}_time_{timestamp:.2f}_{timestamp_str}.jpg"
-    file_path = os.path.join(UPLOAD_DIR, filename)
+    # Simulate fire detection with 10% probability FOR TESTINTG
+    fire_detected = random.random() < 0.1  
+    confidence_score = random.uniform(0.9, 0.99) if fire_detected else random.uniform(0.1, 0.89)
     
-    # Save the file
-    with open(file_path, "wb") as f:
-        f.write(file_content)
-    
-    print(f"Received frame {frame_number} at timestamp {timestamp}")
-    print(f"Saved image to {file_path}, size: {file_size} bytes")
-    
-    # Reset file stream position for potential further operations
-    await image_data.seek(0)
-    
-    return {
-        "message": "Frame received and saved", 
+    response_data = {
+        "message": "Frame received", 
         "frame": frame_number,
-        "saved_path": file_path
+        "user_uuid": user_uuid,
+        "fire_detected": fire_detected,
+        "confidence_score": confidence_score
     }
+    
+    # If fire detected, upload to Supabase
+    if fire_detected:
+        try:
+            await image_data.seek(0)
+            
+            supabase_filename = f"{user_uuid}/{user_uuid}_fire_frame_{frame_number}.jpg"
+            
+
+            upload_result = supabase_client.storage.from_("fireimages").upload(
+                supabase_filename,
+                file_content,
+                file_options={"content-type": "image/jpeg"}
+            )
+            
+            # Get public URL for the uploaded file
+            public_url = supabase_client.storage.from_("fireimages").get_public_url(supabase_filename)
+        
+            print(f"Fire detected! Uploaded to Supabase: {public_url}")
+            
+            response_data["supabase_url"] = public_url
+            
+        except Exception as e:
+            print(f"Error uploading to Supabase: {e}")
+            response_data["supabase_error"] = str(e)
+    
+    return response_data
