@@ -42,7 +42,7 @@ async def receive_data(
     file_size = len(file_content)
     
     # Simulate fire detection with 10% probability FOR TESTINTG
-    fire_detected = random.random() < 0.1  
+    fire_detected = random.random() < 0.4  
     confidence_score = random.uniform(0.9, 0.99) if fire_detected else random.uniform(0.1, 0.89)
     
     response_data = {
