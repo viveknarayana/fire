@@ -1,6 +1,7 @@
-from fastapi import FastAPI, File, UploadFile, Form, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-# Create a FastAPI instance
+from pydantic import BaseModel
+
 app = FastAPI()
 
 app.add_middleware(
@@ -11,8 +12,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Example POST endpoint
+# Define Pydantic model for request body
+class FrameData(BaseModel):
+    frame_number: int
+    image_data: str  # base64-encoded image data (data URL format)
+    timestamp: float
+
 @app.post("/test")
-async def receive_data(request: Request):
-    data = await request.json()
-    return {"message": "Received data", "data": data}
+async def receive_data(data: FrameData):
+    print(f"Received frame {data.frame_number} at {data.timestamp}")
+    # You could decode and save image_data if needed here
+    return {"message": "Frame received", "frame": data.frame_number}
