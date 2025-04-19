@@ -1,3 +1,6 @@
 {
-  "/page": "app/page.js"
+  "/not-found": "app/not-found.js",
+  "/page": "app/page.js",
+  "/login/page": "app/login/page.js",
+  "/auth/callback/route": "app/auth/callback/route.js"
 }

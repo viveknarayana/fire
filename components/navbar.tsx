@@ -76,6 +76,15 @@ export function Navbar() {
           </Link>
         </nav>
         <div className="flex items-center gap-4">
+          <Link href="/login">
+            <Button
+              variant="outline"
+              className="border-red-500/30 text-white hover:bg-red-500/10 hover:text-red-400 transition-all duration-300"
+              size="sm"
+            >
+              Log In
+            </Button>
+          </Link>
           <Link href="/upload">
             <Button
               className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg shadow-red-500/20 transition-all duration-300 hover:shadow-red-500/40"
