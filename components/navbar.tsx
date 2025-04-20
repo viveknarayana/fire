@@ -79,33 +79,8 @@ export function Navbar() {
           </span>
         </Link>
         <nav className="hidden md:flex items-center gap-6">
-          <Link
-            href="/"
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-red-500",
-              pathname === "/" ? "text-red-500" : "text-muted-foreground"
-            )}
-          >
-            Home
-          </Link>
-          <Link
-            href="/features"
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-red-500",
-              pathname === "/features" ? "text-red-500" : "text-muted-foreground"
-            )}
-          >
-            Features
-          </Link>
-          <Link
-            href="/about"
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-red-500",
-              pathname === "/about" ? "text-red-500" : "text-muted-foreground"
-            )}
-          >
-            About
-          </Link>
+
+          
         </nav>
         <div className="flex items-center gap-4">
           {/* Always reserve space for the username */}
