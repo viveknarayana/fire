@@ -2,6 +2,7 @@ import imaplib
 import email
 import email.header
 import time
+import os
 import threading
 from datetime import datetime
 from email.utils import parseaddr
@@ -383,8 +384,8 @@ def start_email_polling():
                 poller.disconnect()
             
             # Wait before checking again
-            print(f"Waiting 3 seconds before checking again...")
-            time.sleep(3)
+            print(f"Waiting 2 seconds before checking again...")
+            time.sleep(2)
             
     except KeyboardInterrupt:
         print("Email polling service stopped by user")
