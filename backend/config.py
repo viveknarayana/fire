@@ -8,7 +8,10 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env.loca
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
-print("Supabase URL:", SUPABASE_URL)
+#Twilio configuration
+TWILIO_ACCOUNT_SID=os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN=os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER=os.getenv("TWILIO_PHONE_NUMBER")
 
 # Mailjet configuration
 MAILJET_API_KEY = os.getenv("MAILJET_API_KEY")
