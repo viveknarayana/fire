@@ -1,25 +1,22 @@
 import os
 import random
-import re
 import base64
-from fastapi import FastAPI, File, Form, UploadFile, Request, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security.api_key import APIKeyHeader, APIKey
+import time
+import imaplib
+import email
+import email.header
+from email.message import EmailMessage
 from datetime import datetime
+from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 import supabase
 from dotenv import load_dotenv
 import google.generativeai as genai
-import requests
-from typing import Optional
-from pyngrok import ngrok
-from mailjet_rest import Client  # Import for Mailjet
+from mailjet_rest import Client
+from email import message_from_bytes
 
 # Load environment variables
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env.local'))
-
-# Setup ngrok tunnel
-public_url = ngrok.connect(8000)
-print(f"ngrok tunnel \"{public_url}\" -> \"http://127.0.0.1:8000\"")
 
 # Initialize Supabase client
 supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
@@ -33,17 +30,19 @@ EMAIL_FROM = os.getenv("EMAIL_FROM")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Fire Detection System")
 print(f"EMAIL_FROM: {EMAIL_FROM}")
 print(f"EMAIL_FROM_NAME: {EMAIL_FROM_NAME}")
+
+# Email IMAP settings
+EMAIL_IMAP_SERVER = os.getenv("EMAIL_IMAP_SERVER", "imap.gmail.com")
+EMAIL_IMAP_PORT = int(os.getenv("EMAIL_IMAP_PORT", "993"))
+EMAIL_USERNAME = os.getenv("EMAIL_USERNAME", EMAIL_FROM)
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+
 # Initialize Mailjet client
 mailjet = Client(auth=(MAILJET_API_KEY, MAILJET_SECRET_KEY), version='v3.1')
 
 # Gemini API configuration
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
-
-# Security for webhook endpoint
-API_KEY_NAME = "X-API-KEY"
-API_KEY = os.getenv("WEBHOOK_API_KEY")
-api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 app = FastAPI()
 
@@ -64,12 +63,6 @@ notified_users = set()
 
 # Dictionary to keep track of user UUIDs by email (to retrieve their images later)
 user_email_to_uuid = {}
-
-async def get_api_key(api_key_header: str = Depends(api_key_header)):
-    if api_key_header == API_KEY:
-        return api_key_header
-    else:
-        raise HTTPException(status_code=403, detail="Could not validate API key")
 
 def send_email_alert(user_email, frame_number, timestamp, user_uuid, image_url=None):
     """Send an email alert to the user when a fire is detected using Mailjet API."""
@@ -321,29 +314,166 @@ def send_status_response_email(to_email, analysis_text, image_url):
         print(f"Error sending status response email: {e}")
         return False
 
-@app.post("/email-webhook")
-async def email_webhook(request: Request):
-    """Handle incoming email webhook requests from Mailjet."""
-    try:
-        # Get the raw request body
-        body = await request.body()
+class EmailPoller:
+    """Class to handle checking for email responses via IMAP."""
+    
+    def __init__(self):
+        self.imap_server = EMAIL_IMAP_SERVER
+        self.imap_port = EMAIL_IMAP_PORT
+        self.username = EMAIL_USERNAME
+        self.password = EMAIL_PASSWORD
+        self.processed_ids = set()  # Track processed message IDs
         
-        # Print the raw payload for debugging
-        print("=== INCOMING EMAIL WEBHOOK PAYLOAD ===")
-        print(f"Raw payload: {body.decode()}")
-        
-        # Try to parse as JSON
+    def connect(self):
+        """Establish connection to the IMAP server."""
         try:
-            data = await request.json()
-            print(f"JSON payload: {data}")
-        except:
-            print("Payload is not valid JSON")
-        
-        return {"status": "received", "message": "Email webhook received and printed"}
+            # Connect to the IMAP server
+            self.mail = imaplib.IMAP4_SSL(self.imap_server, self.imap_port)
             
+            # Login
+            self.mail.login(self.username, self.password)
+            print(f"Connected to {self.imap_server} as {self.username}")
+            return True
+        except Exception as e:
+            print(f"Error connecting to email server: {e}")
+            return False
+            
+    def disconnect(self):
+        """Close the connection to the IMAP server."""
+        try:
+            self.mail.close()
+            self.mail.logout()
+            print("Disconnected from email server")
+        except Exception as e:
+            print(f"Error disconnecting from email server: {e}")
+            
+    def check_for_replies(self):
+        """Check for new reply emails and process them."""
+        try:
+            # Select the inbox
+            self.mail.select('INBOX')
+            print(self.username, "TEMP MAIL USERNAME")
+            
+            status, data = self.mail.search(None, 'UNSEEN')
+
+            
+            # Process each unread email
+            for num in data[0].split():
+                status, data = self.mail.fetch(num, '(RFC822)')
+                
+                if status != 'OK':
+                    print(f"Error fetching email {num}: {status}")
+                    continue
+                    
+                raw_email = data[0][1]
+                email_message = email.message_from_bytes(raw_email)
+                
+                # Get email ID to avoid processing duplicates
+                email_id = email_message.get('Message-ID', '')
+                
+                if email_id in self.processed_ids:
+                    print(f"Already processed email ID: {email_id}")
+                    continue
+                    
+                self.processed_ids.add(email_id)
+                
+                # Extract sender email
+                sender_email = email.utils.parseaddr(email_message['From'])[1]
+                print(f"Sender email: {sender_email}")
+                
+                # Only process emails from users who have received fire alerts
+                if sender_email not in user_email_to_uuid:
+                    # Mark as read but don't process further
+                    self.mail.store(num, '+FLAGS', '\\Seen')
+                    continue
+                
+                # Print email details for debugging (only for relevant users)
+                print("\n=== NEW EMAIL RECEIVED FROM MONITORED USER ===")
+                print(f"From: {email_message['From']}")
+                print(f"To: {email_message['To']}")
+                print(f"Subject: {email_message['Subject']}")
+                print(f"Date: {email_message['Date']}")
+                print(f"Sender email: {sender_email}")
+                
+                # Process email body
+                body = ""
+                
+                # Extract body content based on message type
+                if email_message.is_multipart():
+                    for part in email_message.walk():
+                        content_type = part.get_content_type()
+                        content_disposition = str(part.get("Content-Disposition"))
+                        
+                        # Skip attachments
+                        if "attachment" in content_disposition:
+                            continue
+                            
+                        # Get text content
+                        if content_type in ["text/plain", "text/html"]:
+                            try:
+                                body_part = part.get_payload(decode=True).decode()
+                                body += body_part
+                                break  # We only need one text part
+                            except Exception as e:
+                                print(f"Error decoding email body: {e}")
+                else:
+                    # Get body for non-multipart messages
+                    try:
+                        body = email_message.get_payload(decode=True).decode()
+                    except Exception as e:
+                        print(f"Error decoding email body: {e}")
+                
+                # Process commands in email body
+                self.process_email_command(sender_email, body)
+                
+                # Mark as read
+                self.mail.store(num, '+FLAGS', '\\Seen')
+                
+        except Exception as e:
+            print(f"Error checking for replies: {e}")
+            
+    def process_email_command(self, sender_email, body):
+        """Process commands found in email body."""
+        print(f"\nProcessing email body from {sender_email}: {body[:100]}...")  # Print first 100 chars for debugging
+        
+        # Extract the command (convert to uppercase for case-insensitive matching)
+        body_upper = body.upper()
+        
+        # Check for known commands
+        if "STATUS" in body_upper:
+            print(f"STATUS command received from {sender_email}")
+            self.handle_status_command(sender_email)
+        elif "CALL" in body_upper:
+            print(f"CALL command received from {sender_email}")
+            self.handle_call_command(sender_email)
+        else:
+            print(f"No recognized command in email from {sender_email}")
+
+def start_email_polling():
+    """Start a separate thread to poll for email responses."""
+    poller = EmailPoller()
+    
+    try:
+        print("Starting email polling service...")
+        
+        while True:
+            # Connect to email server
+            if poller.connect():
+                # Check for new emails
+                print("POLLER CONNECTED")
+                poller.check_for_replies()
+                
+                # Disconnect
+                poller.disconnect()
+            
+            # Wait before checking again
+            print(f"Waiting 5 seconds before checking again...")
+            time.sleep(5)
+            
+    except KeyboardInterrupt:
+        print("Email polling service stopped by user")
     except Exception as e:
-        print(f"Error processing email webhook: {e}")
-        return {"status": "error", "error": str(e)}
+        print(f"Error in email polling service: {e}")
 
 @app.post("/test")
 async def receive_data(
@@ -423,55 +553,11 @@ async def receive_data(
 
 @app.on_event("startup")
 async def startup_event():
-    """Configure Mailjet Parse Route with current ngrok URL on startup."""
-    try:
-        # Get the current ngrok URL
-        tunnels = ngrok.get_tunnels()
-        if tunnels:
-            ngrok_url = tunnels[0].public_url
-            webhook_url = f"{ngrok_url}/email-webhook"
-            print(f"Setting up Mailjet Parse Route to: {webhook_url}")
-            
-            # Use v3 API version for Parse Route (not v3.1)
-            mailjet_v3 = Client(auth=(MAILJET_API_KEY, MAILJET_SECRET_KEY), version='v3')
-            
-            # First, check if a Parse Route exists
-            try:
-                get_result = mailjet_v3.parseroute.get()
-                current_routes = get_result.json()
-                print(f"Current Parse Routes: {current_routes}")
-                
-                # If routes exist, delete them
-                if 'Data' in current_routes and current_routes['Data']:
-                    for route in current_routes['Data']:
-                        try:
-                            # Extract the ID from the route data and use it for deletion
-                            route_id = route['ID']
-                            delete_result = mailjet_v3.parseroute.delete(id=route_id)
-                            print(f"Deleted existing Parse Route ID {route_id}: {delete_result.status_code}")
-                        except Exception as delete_error:
-                            print(f"Error deleting Parse Route: {delete_error}")
-            except Exception as get_error:
-                print(f"Error checking existing Parse Routes: {get_error}")
-            
-            # Now create the new Parse Route
-            data = {
-                'Url': webhook_url
-            }
-            
-            try:
-                result = mailjet_v3.parseroute.create(data=data)
-                print(f"Status code: {result.status_code}")
-                print(f"Response: {result.json()}")
-                
-                if result.status_code in (200, 201):
-                    print(f"✅ Mailjet Parse Route successfully configured")
-                else:
-                    print(f"❌ Failed to configure Mailjet Parse Route: {result.status_code}")
-            except Exception as api_error:
-                print(f"API Error: {api_error}")
-                
-        else:
-            print("❌ No ngrok tunnels found")
-    except Exception as e:
-        print(f"❌ Error configuring Mailjet Parse Route: {e}")
+    """Start email polling service on application startup."""
+    import threading
+    
+    polling_thread = threading.Thread(target=start_email_polling)
+    polling_thread.daemon = True  
+    polling_thread.start()
+    print("Email polling thread started")
+
