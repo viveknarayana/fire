@@ -190,7 +190,7 @@ export default function VideoProcessor() {
                 setProcessProgress(Math.min(100, Math.floor((frameTime / video.duration) * 100)));
                 
                 // Show notification every 100 frames processed
-                if (framesProcessed % 10 === 0) {
+                if (framesProcessed % 100 === 0) {
                   console.log(`Processed frame ${framesProcessed} at time ${frameTime.toFixed(2)} seconds`);
                   canvas.toBlob(async (blob) => {
                     if (blob) {
