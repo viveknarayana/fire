@@ -6,6 +6,7 @@ import threading
 from datetime import datetime
 from email.utils import parseaddr
 from mailjet_rest import Client
+import asyncio
 
 from config import (MAILJET_API_KEY, MAILJET_SECRET_KEY, EMAIL_FROM, 
                     EMAIL_FROM_NAME, EMAIL_IMAP_SERVER, EMAIL_IMAP_PORT, 
