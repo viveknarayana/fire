@@ -11,6 +11,7 @@ import {
   Video, 
   ArrowRight 
 } from "lucide-react";
+import { fetchUserData } from "@/server/fetchData";
 import { HeroSection } from "@/components/hero-section";
 import { FeatureCard } from "@/components/feature-card";
 import { StatCard } from "@/components/stat-card";
@@ -46,7 +47,7 @@ export default function Home() {
             <FeatureCard 
               icon={<Map className="h-12 w-12 text-red-500" />}
               title="Location Tracking"
-              description="Precise location data helps emergency services respond quickly to the exact coordinates."
+              description="Precise location data helps emergency services respond quickly to the exact coordinates. TBA"
             />
             <FeatureCard 
               icon={<Cpu className="h-12 w-12 text-red-500" />}
@@ -67,27 +68,7 @@ export default function Home() {
         </div>
       </section>
       
-      {/* Stats Section */}
-      <section className="py-24 bg-gradient-to-b from-black/95 to-black relative overflow-hidden">
-        <div className="absolute inset-0 bg-red-500/5 z-0"></div>
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-red-500 to-red-700 bg-clip-text text-transparent">
-              Making a Difference
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Firewatch is helping protect forests and communities around the world.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
-            <StatCard number="95%" label="Detection Accuracy" />
-            <StatCard number="30s" label="Average Detection Time" />
-            <StatCard number="240+" label="Protected Areas" />
-            <StatCard number="1.2M" label="Acres Safeguarded" />
-          </div>
-        </div>
-      </section>
+      
     </>
   );
 }

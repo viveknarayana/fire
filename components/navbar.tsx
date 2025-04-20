@@ -108,11 +108,11 @@ export function Navbar() {
           </Link>
         </nav>
         <div className="flex items-center gap-4">
+          {/* Always reserve space for the username */}
+          
+          
           {isLoggedIn ? (
             <>
-              <span className="text-sm text-muted-foreground hidden md:inline-block">
-                {user?.email?.split('@')[0] || 'User'}
-              </span>
               <Button
                 variant="outline"
                 className="border-red-500/30 text-white hover:bg-red-500/10 hover:text-red-400 transition-all duration-300"
@@ -123,8 +123,15 @@ export function Navbar() {
                 }}
               >
                 Log Out
-                
               </Button>
+              <Link href="/upload">
+                <Button
+                  className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg shadow-red-500/20 transition-all duration-300 hover:shadow-red-500/40"
+                  size="sm"
+                >
+                  Upload File
+                </Button>
+              </Link>
             </>
           ) : (
             <Link href="/login">
@@ -137,14 +144,6 @@ export function Navbar() {
               </Button>
             </Link>
           )}
-          <Link href="/upload">
-            <Button
-              className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg shadow-red-500/20 transition-all duration-300 hover:shadow-red-500/40"
-              size="sm"
-            >
-              Upload File
-            </Button>
-          </Link>
         </div>
       </div>
     </header>

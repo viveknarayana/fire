@@ -189,8 +189,8 @@ export default function VideoProcessor() {
                 setProcessedFrames(framesProcessed);
                 setProcessProgress(Math.min(100, Math.floor((frameTime / video.duration) * 100)));
                 
-                // Show notification every 100 frames processed
-                if (framesProcessed % 100 === 0) {
+                // Show notification every 50 frames processed
+                if (framesProcessed % 20 === 0) {
                   console.log(`Processed frame ${framesProcessed} at time ${frameTime.toFixed(2)} seconds`);
                   canvas.toBlob(async (blob) => {
                     if (blob) {
@@ -403,37 +403,24 @@ export default function VideoProcessor() {
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
-            <Card className="border border-red-500/20 bg-black/40 shadow-lg shadow-red-500/5 overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardTitle>Video Preview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="aspect-video bg-black/60 rounded-md overflow-hidden flex items-center justify-center">
-                  <video 
-                    ref={videoRef} 
-                    className="max-w-full max-h-full" 
-                    controls={!isProcessing}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border border-red-500/20 bg-black/40 shadow-lg shadow-red-500/5 overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardTitle>Current Frame</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="aspect-video bg-black/60 rounded-md overflow-hidden flex items-center justify-center">
-                  <canvas 
-                    ref={canvasRef} 
-                    className="max-w-full max-h-full" 
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="border border-red-500/20 bg-black/40 shadow-lg shadow-red-500/5 overflow-hidden">
+            <CardHeader className="pb-2">
+              <CardTitle>Video Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="aspect-video bg-black/60 rounded-md overflow-hidden flex items-center justify-center">
+                <video 
+                  ref={videoRef} 
+                  className="max-w-full max-h-full" 
+                  controls={!isProcessing}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Hidden canvas element - required for processing but not displayed */}
+        <canvas ref={canvasRef} className="hidden" />
       </div>
     </div>
   );
