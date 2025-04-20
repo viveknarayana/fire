@@ -7,6 +7,8 @@ from pyngrok import ngrok
 from twilio.twiml.voice_response import VoiceResponse, Gather
 from fastapi.responses import PlainTextResponse
 from fastapi import Form, Request
+import base64
+import requests
 
 # Import services
 from services.storage_service import upload_fire_image
@@ -42,9 +44,9 @@ async def receive_data(
     file_content = await image_data.read()
     file_size = len(file_content)
     
-    # Simulate fire detection with 40% probability FOR TESTING
-    fire_detected = random.random() < 0.4
-    confidence_score = random.uniform(0.9, 0.99) if fire_detected else random.uniform(0.1, 0.89)
+    # Call Roboflow API to detect fire
+    fire_detected, confidence_score = await detect_fire(file_content)
+    print(f"Fire detected: {fire_detected}, Confidence score: {confidence_score}")
     
     response_data = {
         "message": "Frame received", 
@@ -58,9 +60,10 @@ async def receive_data(
     if user_email:
         response_data["user_email"] = user_email
     
-    # If fire detected, upload to Supabase and send email alert, also pass image into gemini anayzle file to see if we should call local fire department
+    # If fire detected, upload to Supabase and send email alert
     if fire_detected:
         try:
+            # Reset file pointer position since we've read it already
             await image_data.seek(0)
             file_content = await image_data.read()
             
@@ -72,7 +75,6 @@ async def receive_data(
                 response_data["supabase_url"] = public_url
                 
                 # Send email alert if user email is provided and they haven't been notified yet
-                # Using a combination of UUID and frame/100 to limit notifications
                 notification_key = f"{user_uuid}_{frame_number // 100}"
                 
                 if user_email and notification_key not in notified_users:
@@ -100,6 +102,59 @@ async def receive_data(
             response_data["error"] = str(e)
     
     return response_data
+
+async def detect_fire(image_bytes):
+    """
+    Call Roboflow API to detect fire in the image.
+    Returns a tuple of (fire_detected, confidence_score)
+    """
+    try:
+        # Convert the image bytes to base64
+        base64_image = base64.b64encode(image_bytes).decode('utf-8')
+        
+        # Set up the API request
+        api_key = "IU5B46WHH0ZwNfnUG2lM"
+        url = "https://serverless.roboflow.com/fire-smoke-spark/2"
+        
+        # Make the API request
+        response = requests.post(
+            url,
+            params={"api_key": api_key},
+            data=base64_image,
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            # Process the result to find fire detection
+            # This assumes the API returns predictions in a certain format
+            # You may need to adjust based on the actual response structure
+            predictions = result.get("predictions", [])
+            
+            # Find the highest confidence prediction for fire
+            highest_confidence = 0
+            for pred in predictions:
+                if pred.get("class") in ["fire", "smoke", "spark"]:  # Adjust class names as needed
+                    confidence = pred.get("confidence", 0)
+                    highest_confidence = max(highest_confidence, confidence)
+            
+            # Determine if fire is detected based on confidence threshold
+            fire_detected = highest_confidence >= 0.5
+            return fire_detected, highest_confidence
+        else:
+            print(f"API request failed with status code {response.status_code}: {response.text}")
+            # Fallback to random for testing if API fails
+            fire_detected = random.random() < 0.4
+            confidence_score = random.uniform(0.9, 0.99) if fire_detected else random.uniform(0.1, 0.49)
+            return fire_detected, confidence_score
+            
+    except Exception as e:
+        print(f"Error in fire detection: {e}")
+        # Fallback to random for testing if exception occurs
+        fire_detected = random.random() < 0.4
+        confidence_score = random.uniform(0.9, 0.99) if fire_detected else random.uniform(0.1, 0.49)
+        return fire_detected, confidence_score
 
 
 

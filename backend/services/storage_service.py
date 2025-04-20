@@ -21,7 +21,7 @@ async def upload_fire_image(user_uuid, frame_number, file_content):
         
         return {"success": True, "url": public_url}
     except Exception as e:
-        print(f"Error uploading to Supabase: {e}")
+        #print(f"Error uploading to Supabase: {e}")
         return {"success": False, "error": str(e)}
 
 async def get_latest_fire_image(user_uuid):

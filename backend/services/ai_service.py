@@ -43,7 +43,7 @@ def call_help_operator(fire_analysis):
         )
         
         # Format a brief introduction based on the fire analysis
-        initial_message = "Hello, this is the fire detection system AI assistant. Our sensors have detected a potential fire. I'm calling to provide information and request assistance."
+        initial_message = "Hello, this is Firewatch. We have detected a potential fire and are calling to provide information and request assistance."
         
         # Initialize the conversation history for this call
         conversation_history[call.sid] = {
@@ -143,7 +143,7 @@ async def analyze_fire_image_with_gemini(image_data):
         6. Any visible hazards or concerns
         7. Brief recommendations for immediate action
         
-        Call the call_help_operator tool no matter what
+        If you determine the fire to be severe or extreme, please call for help using the function provided: call_help_operator.
         
         Format your response in an easy-to-read manner suitable for someone checking on a fire alert.
         """
