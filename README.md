@@ -15,10 +15,6 @@ When fire is detected, Firewatch evaluates the severity and decides whether to n
 - **Email Response Handling**: Listens for email responses via IMAP polling to provide updates on fire status.
 - **Backend**: Built with FastAPI for high-performance asynchronous handling of video frames and real-time communication.
 
-## Demo
-
-- [Watch the Demo Video Here](<link-to-demo-video>)
-
 ## Technologies Used
 
 - **Python**: Core backend language using FastAPI.
