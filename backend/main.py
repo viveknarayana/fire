@@ -124,8 +124,6 @@ async def get_latest_fire_image(user_uuid):
         # List all objects in the user's directory
         list_result = supabase_client.storage.from_("fireimages").list(user_uuid)
         
-        # Sort files by name (assuming the format includes frame number which increases)
-        # In a production environment, you might want to sort by timestamp or add metadata
         sorted_files = sorted(list_result, key=lambda x: x['name'], reverse=True)
         
         if not sorted_files:
