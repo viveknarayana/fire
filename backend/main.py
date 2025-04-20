@@ -21,6 +21,7 @@ from services.ai_service import analyze_fire_image_with_gemini
 
 
 alreadyCalled = False
+analysis = None
 
 
 app = FastAPI()
@@ -41,6 +42,8 @@ async def receive_data(
     user_email: str = Form(None),
     image_data: UploadFile = File(...)
 ):
+    global alreadyCalled
+    global analysis
     # Get file content
     file_content = await image_data.read()
     file_size = len(file_content)
@@ -72,7 +75,7 @@ async def receive_data(
             if response_data["confidence_score"] >= 0.82: 
                 print("Uploading to Supabase...")
                 upload_result = await upload_fire_image(user_uuid, frame_number, file_content)
-                analysis = await analyze_fire_image_with_gemini(file_content) # So we can call help operator when the fire is instantly detected, rather than waiting for user to request status
+                
                 if upload_result["success"]:
                     print("Upload successful")
                     public_url = upload_result["url"]
@@ -105,6 +108,11 @@ async def receive_data(
         except Exception as e:
             print(f"Error processing file: {e}")
             response_data["error"] = str(e)
+
+        if alreadyCalled == False:
+            analysis = await analyze_fire_image_with_gemini(file_content) # So we can call help operator when the fire is instantly detected, rather than waiting for user to request status
+        if analysis:
+            alreadyCalled = True
     
     return response_data
 
