@@ -3,11 +3,22 @@ import random
 import asyncio
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pyngrok import ngrok
+from twilio.twiml.voice_response import VoiceResponse, Gather
+from fastapi.responses import PlainTextResponse
+from fastapi import Form, Request
 
 # Import services
 from services.storage_service import upload_fire_image
 from services.email_service import send_email_alert, notified_users, start_email_polling_thread
 from models.schemas import FireDetectionResponse
+from config import conversation_history
+from services.ai_service import generate_conversation_response
+from services.ai_service import SYSTEM_PROMPT
+
+
+
+
 
 app = FastAPI()
 
@@ -47,7 +58,7 @@ async def receive_data(
     if user_email:
         response_data["user_email"] = user_email
     
-    # If fire detected, upload to Supabase and send email alert
+    # If fire detected, upload to Supabase and send email alert, also pass image into gemini anayzle file to see if we should call local fire department
     if fire_detected:
         try:
             await image_data.seek(0)
@@ -89,6 +100,70 @@ async def receive_data(
             response_data["error"] = str(e)
     
     return response_data
+
+
+
+@app.post("/fire-conversation")
+async def handle_conversation(request: Request):
+    """Handle the webhook for the interactive fire emergency call"""
+    form_data = await request.form()
+    call_sid = form_data.get('CallSid')
+    user_input = form_data.get('SpeechResult', '')
+    
+    # Create TwiML response
+    response = VoiceResponse()
+    
+    # If this is a new call (no user input yet)
+    if not user_input:
+        # If we have this call in our history, use the initial message
+        if call_sid in conversation_history:
+            initial_message = conversation_history[call_sid]["messages"][-1]["content"]
+        else:
+            # Default initial message if something went wrong
+            initial_message = "Hello, this is your fire detection system AI assistant. We've detected a potential fire. Is everyone safe and do you need assistance?"
+            conversation_history[call_sid] = {
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "assistant", "content": initial_message}
+                ]
+            }
+        
+        # Speak the initial message and gather response
+        gather = Gather(input='speech', action='/fire-conversation-response', method='POST', timeout=5, speech_timeout='auto')
+        gather.say(initial_message)
+        response.append(gather)
+        
+        # If no response, repeat the question
+        response.redirect('/fire-conversation')
+    
+    return PlainTextResponse(content=str(response), media_type="application/xml")
+
+@app.post("/fire-conversation-response")
+async def process_conversation_response(request: Request):
+    """Process user's spoken response and continue the conversation"""
+    form_data = await request.form()
+    call_sid = form_data.get('CallSid')
+    user_input = form_data.get('SpeechResult', '')
+    
+    # Generate AI response based on user input
+    ai_response = await generate_conversation_response(call_sid, user_input)
+    if isinstance(ai_response, tuple):
+        ai_response = ' '.join(str(part) for part in ai_response)
+    print(f"AI Response: {ai_response}")
+    
+    # Create TwiML response
+    response = VoiceResponse()
+    
+    # Continue the conversation
+    gather = Gather(input='speech', action='/fire-conversation-response', method='POST', timeout=5, speech_timeout='auto')
+    gather.say(ai_response)
+    response.append(gather)
+    
+    # If no response, repeat the last message
+    response.redirect('/fire-conversation')
+    
+    return PlainTextResponse(content=str(response), media_type="application/xml")
+
 
 @app.on_event("startup")
 async def startup_event():

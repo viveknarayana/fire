@@ -223,7 +223,7 @@ class EmailPoller:
             
             # Login
             self.mail.login(self.username, self.password)
-            print(f"Connected to {self.imap_server} as {self.username}")
+            #print(f"Connected to {self.imap_server} as {self.username}")
             return True
         except Exception as e:
             print(f"Error connecting to email server: {e}")
@@ -234,7 +234,7 @@ class EmailPoller:
         try:
             self.mail.close()
             self.mail.logout()
-            print("Disconnected from email server")
+            #print("Disconnected from email server")
         except Exception as e:
             print(f"Error disconnecting from email server: {e}")
             
@@ -243,7 +243,7 @@ class EmailPoller:
         try:
             # Select the inbox
             self.mail.select('INBOX')
-            print(self.username, "TEMP MAIL USERNAME")
+            #print(self.username, "TEMP MAIL USERNAME")
             
             status, data = self.mail.search(None, 'UNSEEN')
             
@@ -371,21 +371,21 @@ def start_email_polling():
     poller = EmailPoller()
     
     try:
-        print("Starting email polling service...")
+        #print("Starting email polling service...")
         
         while True:
             # Connect to email server
             if poller.connect():
                 # Check for new emails
-                print("POLLER CONNECTED")
+                #print("POLLER CONNECTED")
                 poller.check_for_replies()
                 
                 # Disconnect
                 poller.disconnect()
             
             # Wait before checking again
-            print(f"Waiting 2 seconds before checking again...")
-            time.sleep(2)
+            #print(f"Waiting 2 seconds before checking again...")
+            time.sleep(1)
             
     except KeyboardInterrupt:
         print("Email polling service stopped by user")
