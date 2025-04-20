@@ -4,3 +4,5 @@ Pillow
 dotenv
 supabase
 google-generativeai requests
+pyngrok 
+mailjet_rest

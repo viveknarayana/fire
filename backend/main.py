@@ -1,10 +1,7 @@
 import os
 import random
-import smtplib
 import re
 import base64
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from fastapi import FastAPI, File, Form, UploadFile, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader, APIKey
@@ -14,21 +11,30 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 import requests
 from typing import Optional
+from pyngrok import ngrok
+from mailjet_rest import Client  # Import for Mailjet
 
 # Load environment variables
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env.local'))
+
+# Setup ngrok tunnel
+public_url = ngrok.connect(8000)
+print(f"ngrok tunnel \"{public_url}\" -> \"http://127.0.0.1:8000\"")
 
 # Initialize Supabase client
 supabase_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 supabase_key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 supabase_client = supabase.create_client(supabase_url, supabase_key)
 
-# Email configuration
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")  
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))  
-EMAIL_USERNAME = os.getenv("EMAIL_USERNAME") 
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  
-EMAIL_FROM = os.getenv("EMAIL_FROM", EMAIL_USERNAME)  
+# Mailjet configuration
+MAILJET_API_KEY = os.getenv("MAILJET_API_KEY")
+MAILJET_SECRET_KEY = os.getenv("MAILJET_SECRET_KEY")
+EMAIL_FROM = os.getenv("EMAIL_FROM")
+EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Fire Detection System")
+print(f"EMAIL_FROM: {EMAIL_FROM}")
+print(f"EMAIL_FROM_NAME: {EMAIL_FROM_NAME}")
+# Initialize Mailjet client
+mailjet = Client(auth=(MAILJET_API_KEY, MAILJET_SECRET_KEY), version='v3.1')
 
 # Gemini API configuration
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -66,19 +72,14 @@ async def get_api_key(api_key_header: str = Depends(api_key_header)):
         raise HTTPException(status_code=403, detail="Could not validate API key")
 
 def send_email_alert(user_email, frame_number, timestamp, user_uuid, image_url=None):
-    """Send an email alert to the user when a fire is detected."""
+    """Send an email alert to the user when a fire is detected using Mailjet API."""
     try:
         # Store the email-to-uuid mapping for later use
         user_email_to_uuid[user_email] = user_uuid
-        
-        # Create the email message
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_FROM
-        msg['To'] = user_email
-        msg['Subject'] = "🔥 URGENT: Fire Detection Alert! 🔥"
+        print(f"User email {user_email} mapped to UUID {user_uuid}")
         
         # Email body with reply instructions
-        body = f"""
+        html_body = f"""
         <html>
         <body>
             <h2>⚠️ Fire Detection Alert ⚠️</h2>
@@ -102,18 +103,61 @@ def send_email_alert(user_email, frame_number, timestamp, user_uuid, image_url=N
         </html>
         """
         
-        # Attach HTML content
-        msg.attach(MIMEText(body, 'html'))
+        # Text version for clients that don't support HTML
+        text_body = f"""
+        ⚠️ Fire Detection Alert ⚠️
         
-        # Connect to SMTP server and send email
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
-            server.starttls()  # Enable TLS encryption
-            server.login(EMAIL_USERNAME, EMAIL_PASSWORD)
-            print("SENDING EMAIL")
-            server.send_message(msg)
+        Our system has detected a potential fire in your video processing.
         
-        print(f"Email alert sent to {user_email}")
-        return True
+        Details:
+        - Frame Number: {frame_number}
+        - Timestamp: {timestamp:.2f} seconds
+        - Detection Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        
+        {"You can view the detected frame here: " + image_url if image_url else ""}
+        
+        Please check your monitoring system immediately and take appropriate action.
+        
+        Need an update? You can reply to this email with:
+        - STATUS - To get an AI analysis of the current fire situation
+        - CALL - To request emergency services (coming soon)
+        
+        This is an automated message from your fire monitoring system.
+        """
+        
+        # Create Mailjet email data structure
+        data = {
+            'Messages': [
+                {
+                    'From': {
+                        'Email': EMAIL_FROM,
+                        'Name': EMAIL_FROM_NAME
+                    },
+                    'To': [
+                        {
+                            'Email': user_email
+                        }
+                    ],
+                    'Subject': "🔥 URGENT: Fire Detection Alert! 🔥",
+                    'TextPart': text_body,
+                    'HTMLPart': html_body,
+                    'CustomID': f"fire_alert_{user_uuid}_{frame_number}"
+                }
+            ]
+        }
+        
+        # Send the email using Mailjet API
+        print("SENDING EMAIL VIA MAILJET")
+        result = mailjet.send.create(data=data)
+        
+        # Check if the email was sent successfully
+        if result.status_code == 200:
+            print(f"Email alert sent to {user_email}")
+            return True
+        else:
+            print(f"Failed to send email: {result.status_code}, {result.json()}")
+            return False
+            
     except Exception as e:
         print(f"Error sending email alert: {e}")
         return False
@@ -188,19 +232,13 @@ async def analyze_fire_image_with_gemini(image_data):
         return "Unable to analyze the fire image at this moment. Please check the visual directly or contact emergency services if the situation appears dangerous."
 
 def send_status_response_email(to_email, analysis_text, image_url):
-    """Send a response email with fire status analysis."""
+    """Send a response email with fire status analysis using Mailjet API."""
     try:
-        # Create the email message
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_FROM
-        msg['To'] = to_email
-        msg['Subject'] = "Fire Status Analysis - Automated Response"
-        
         # Current time for the report
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # Email body with the analysis
-        body = f"""
+        # HTML body with the analysis
+        html_body = f"""
         <html>
         <body>
             <h2>🔍 Fire Status Analysis Report</h2>
@@ -226,83 +264,82 @@ def send_status_response_email(to_email, analysis_text, image_url):
         </html>
         """
         
-        # Attach HTML content
-        msg.attach(MIMEText(body, 'html'))
+        # Text version
+        text_body = f"""
+        🔍 Fire Status Analysis Report
         
-        # Connect to SMTP server and send email
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
-            server.starttls()  # Enable TLS encryption
-            server.login(EMAIL_USERNAME, EMAIL_PASSWORD)
-            server.send_message(msg)
+        Time of Report: {current_time}
         
-        print(f"Status analysis email sent to {to_email}")
-        return True
+        Below is an AI-powered analysis of the most recent fire image:
+        
+        {analysis_text}
+        
+        Reference Image: {image_url}
+        
+        Important: This is an automated analysis. In case of an actual emergency, please contact emergency services immediately.
+        
+        You can continue to reply with:
+        - STATUS - For an updated analysis
+        - CALL - To request emergency services (coming soon)
+        
+        This is an automated message from your fire monitoring system.
+        """
+        
+        # Create Mailjet email data structure
+        data = {
+            'Messages': [
+                {
+                    'From': {
+                        'Email': EMAIL_FROM,
+                        'Name': EMAIL_FROM_NAME
+                    },
+                    'To': [
+                        {
+                            'Email': to_email
+                        }
+                    ],
+                    'Subject': "Fire Status Analysis - Automated Response",
+                    'TextPart': text_body,
+                    'HTMLPart': html_body,
+                    'CustomID': f"fire_status_{datetime.now().timestamp()}"
+                }
+            ]
+        }
+        
+        # Send the email using Mailjet API
+        result = mailjet.send.create(data=data)
+        
+        # Check if the email was sent successfully
+        if result.status_code == 200:
+            print(f"Status analysis email sent to {to_email}")
+            return True
+        else:
+            print(f"Failed to send status email: {result.status_code}, {result.json()}")
+            return False
+            
     except Exception as e:
         print(f"Error sending status response email: {e}")
         return False
 
-@app.post("/email-webhook", dependencies=[Depends(get_api_key)])
+@app.post("/email-webhook")
 async def email_webhook(request: Request):
-    """Handle incoming email webhook requests (for replies to alert emails)."""
+    """Handle incoming email webhook requests from Mailjet."""
     try:
-        data = await request.json()
+        # Get the raw request body
+        body = await request.body()
         
-        # Extract the sender email and the message body
-        # The exact structure will depend on your email webhook provider
-        sender_email = data.get("from", "").lower()
-        subject = data.get("subject", "")
-        body_text = data.get("text", "").strip().upper()
+        # Print the raw payload for debugging
+        print("=== INCOMING EMAIL WEBHOOK PAYLOAD ===")
+        print(f"Raw payload: {body.decode()}")
         
-        # Check if this is a reply to our alert (may need customization based on your webhook provider)
-        is_reply = "URGENT: Fire Detection Alert" in subject
+        # Try to parse as JSON
+        try:
+            data = await request.json()
+            print(f"JSON payload: {data}")
+        except:
+            print("Payload is not valid JSON")
         
-        if not is_reply:
-            return {"status": "ignored", "reason": "Not a reply to alert email"}
-        
-        # Check for STATUS command
-        if "STATUS" in body_text:
-            # Look up the user UUID based on their email
-            user_uuid = user_email_to_uuid.get(sender_email)
-            
-            if not user_uuid:
-                return {"status": "error", "reason": "User UUID not found for this email"}
-            
-            # Get the latest fire image for this user
-            latest_image = await get_latest_fire_image(user_uuid)
-            
-            if not latest_image:
-                return {"status": "error", "reason": "No fire images found for this user"}
-            
-            # Analyze the image with Gemini
-            analysis = await analyze_fire_image_with_gemini(latest_image["content"])
-            
-            # Send the analysis back to the user
-            email_sent = send_status_response_email(
-                to_email=sender_email,
-                analysis_text=analysis,
-                image_url=latest_image["url"]
-            )
-            
-            return {
-                "status": "success" if email_sent else "error",
-                "command": "STATUS",
-                "action": "Analysis sent" if email_sent else "Failed to send analysis"
-            }
-        
-        # Handle CALL command (placeholder for now)
-        elif "CALL" in body_text:
-            return {
-                "status": "received",
-                "command": "CALL",
-                "action": "Feature coming soon"
-            }
-        
-        # Unknown command
-        else:
-            return {
-                "status": "ignored",
-                "reason": "No recognized command in email"
-            }
+        return {"status": "received", "message": "Email webhook received and printed"}
             
     except Exception as e:
         print(f"Error processing email webhook: {e}")
@@ -366,7 +403,7 @@ async def receive_data(
                     user_email=user_email,
                     frame_number=frame_number,
                     timestamp=timestamp,
-                    user_uuid=user_uuid,  # Pass user_uuid to store the mapping
+                    user_uuid=user_uuid,
                     image_url=public_url
                 )
                 
@@ -384,9 +421,57 @@ async def receive_data(
     
     return response_data
 
-# Optional: Periodically clear the notification tracking set (e.g., every 30 minutes)
 @app.on_event("startup")
 async def startup_event():
-    # You could implement a background task here to clear notified_users
-    # periodically to allow new notifications after some time has passed
-    pass
+    """Configure Mailjet Parse Route with current ngrok URL on startup."""
+    try:
+        # Get the current ngrok URL
+        tunnels = ngrok.get_tunnels()
+        if tunnels:
+            ngrok_url = tunnels[0].public_url
+            webhook_url = f"{ngrok_url}/email-webhook"
+            print(f"Setting up Mailjet Parse Route to: {webhook_url}")
+            
+            # Use v3 API version for Parse Route (not v3.1)
+            mailjet_v3 = Client(auth=(MAILJET_API_KEY, MAILJET_SECRET_KEY), version='v3')
+            
+            # First, check if a Parse Route exists
+            try:
+                get_result = mailjet_v3.parseroute.get()
+                current_routes = get_result.json()
+                print(f"Current Parse Routes: {current_routes}")
+                
+                # If routes exist, delete them
+                if 'Data' in current_routes and current_routes['Data']:
+                    for route in current_routes['Data']:
+                        try:
+                            # Extract the ID from the route data and use it for deletion
+                            route_id = route['ID']
+                            delete_result = mailjet_v3.parseroute.delete(id=route_id)
+                            print(f"Deleted existing Parse Route ID {route_id}: {delete_result.status_code}")
+                        except Exception as delete_error:
+                            print(f"Error deleting Parse Route: {delete_error}")
+            except Exception as get_error:
+                print(f"Error checking existing Parse Routes: {get_error}")
+            
+            # Now create the new Parse Route
+            data = {
+                'Url': webhook_url
+            }
+            
+            try:
+                result = mailjet_v3.parseroute.create(data=data)
+                print(f"Status code: {result.status_code}")
+                print(f"Response: {result.json()}")
+                
+                if result.status_code in (200, 201):
+                    print(f"✅ Mailjet Parse Route successfully configured")
+                else:
+                    print(f"❌ Failed to configure Mailjet Parse Route: {result.status_code}")
+            except Exception as api_error:
+                print(f"API Error: {api_error}")
+                
+        else:
+            print("❌ No ngrok tunnels found")
+    except Exception as e:
+        print(f"❌ Error configuring Mailjet Parse Route: {e}")
