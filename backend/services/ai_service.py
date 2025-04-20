@@ -67,16 +67,13 @@ def call_help_operator(fire_analysis):
             "message": f"Failed to place emergency call: {str(e)}"
         }
 
-import asyncio
-import json
-import aiohttp
+from cerebras.cloud.sdk import Cerebras
 
 async def generate_conversation_response(call_sid, user_input):
     """
-    Generate a response to the user using Cerebras API based on conversation history
+    Generate a response to the user using Cerebras SDK based on conversation history
     """
-    #return "I am going to repeat what you said: ", user_input
-    """ try:
+    try:
         # Add user's input to conversation history
         conversation_history[call_sid]["messages"].append({"role": "user", "content": user_input})
         
@@ -86,41 +83,30 @@ async def generate_conversation_response(call_sid, user_input):
         # Prepare messages for Cerebras API
         messages = conversation_history[call_sid]["messages"].copy()
         
-        # Set Cerebras API endpoint and credentials
-        model_id = "llama-4-scout-17b-16e-instruct"  # Replace with your Cerebras model ID
-        cerebras_api_url = "https://api.cerebras.net/v1/models/{model_id}/predict"
-
-        api_key = CEREBRAS_API_KEY # Replace with your Cerebras API key
         
-        # Prepare API request payload
-        payload = {
-            "messages": messages,
-            "max_tokens": 150  # Keep responses concise for voice conversation
-        }
-        
-        # Set API request headers
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
+        # Initialize Cerebras client
+        client = Cerebras(
+            api_key=CEREBRAS_API_KEY,
+        )
         
         # Call Cerebras API for response generation
-        async with aiohttp.ClientSession() as session:
-            async with session.post(cerebras_api_url.format(model_id=model_id), headers=headers, data=json.dumps(payload)) as response:
-                if response.status == 200:
-                    response_data = await response.json()
-                    response_text = response_data.get("response", "")
-                    
-                    # Add assistant's response to conversation history
-                    conversation_history[call_sid]["messages"].append({"role": "assistant", "content": response_text})
-                    
-                    return response_text
-                else:
-                    print(f"Error generating response: {response.status}")
-                    return "I'm sorry, I'm having trouble processing that. Is everyone safe? If you're in immediate danger, please hang up and call emergency services directly."
+        chat_completion = client.chat.completions.create(
+            messages=messages,
+            model="llama-4-scout-17b-16e-instruct",
+            max_tokens=100  # Keep responses concise for voice conversation
+        )
+        
+        # Extract response text
+        response_text = chat_completion.choices[0].message.content
+        
+        # Add assistant's response to conversation history
+        conversation_history[call_sid]["messages"].append({"role": "assistant", "content": response_text})
+        
+        return response_text
+        
     except Exception as e:
         print(f"Error generating response: {e}")
-        return "I'm sorry, I'm having trouble processing that. Is everyone safe? If you're in immediate danger, please hang up and call emergency services directly." """
+        return "I'm sorry, I'm having trouble processing that. Is everyone safe? If you're in immediate danger, please hang up and call emergency services directly."
 
 
 async def analyze_fire_image_with_gemini(image_data):
