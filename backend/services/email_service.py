@@ -48,8 +48,7 @@ def send_email_alert(user_email, frame_number, timestamp, user_uuid, image_url=N
             <hr>
             <p><strong>Need an update?</strong> You can reply to this email with:</p>
             <ul>
-                <li><strong>STATUS</strong> - To get an AI analysis of the current fire situation</li>
-                <li><strong>CALL</strong> - To request emergency services (coming soon)</li>
+                <li><strong>STATUS</strong> – Receive an AI-powered assessment of the current fire situation and determine if fire department intervention is still necessary.</li>
             </ul>
             <p><em>This is an automated message from your fire monitoring system.</em></p>
         </body>

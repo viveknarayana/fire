@@ -143,7 +143,8 @@ async def analyze_fire_image_with_gemini(image_data):
         6. Any visible hazards or concerns
         7. Brief recommendations for immediate action
         
-        If you determine the fire to be severe or extreme, please call for help using the function provided: call_help_operator.
+        If you determine the fire to be EXTREMELY LARGE or HIGH RISK, please call for emergency assistance using call_help_operator. If the fire is manageable, please just provide the analysis. 
+        The email notification will suffice in this case.
         
         Format your response in an easy-to-read manner suitable for someone checking on a fire alert.
         """

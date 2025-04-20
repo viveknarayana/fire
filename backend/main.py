@@ -17,6 +17,7 @@ from models.schemas import FireDetectionResponse
 from config import conversation_history
 from services.ai_service import generate_conversation_response
 from services.ai_service import SYSTEM_PROMPT
+from services.ai_service import analyze_fire_image_with_gemini
 
 
 
@@ -68,34 +69,38 @@ async def receive_data(
             file_content = await image_data.read()
             
             # Upload to Supabase
-            upload_result = await upload_fire_image(user_uuid, frame_number, file_content)
-            
-            if upload_result["success"]:
-                public_url = upload_result["url"]
-                response_data["supabase_url"] = public_url
+            if response_data["confidence_score"] >= 0.90: 
+                print("Uploading to Supabase...")
+                upload_result = await upload_fire_image(user_uuid, frame_number, file_content)
                 
-                # Send email alert if user email is provided and they haven't been notified yet
-                notification_key = f"{user_uuid}_{frame_number // 100}"
-                
-                if user_email and notification_key not in notified_users:
-                    # Send email with the image URL
-                    email_sent = send_email_alert(
-                        user_email=user_email,
-                        frame_number=frame_number,
-                        timestamp=timestamp,
-                        user_uuid=user_uuid,
-                        image_url=public_url
-                    )
+                if upload_result["success"]:
+                    print("Upload successful")
+                    public_url = upload_result["url"]
+                    response_data["supabase_url"] = public_url
                     
-                    if email_sent:
-                        notified_users.add(notification_key)
-                        response_data["email_alert"] = "sent"
-                    else:
-                        response_data["email_alert"] = "failed"
-                elif notification_key in notified_users:
-                    response_data["email_alert"] = "already_notified"
-            else:
-                response_data["supabase_error"] = upload_result["error"]
+                    # Send email alert if user email is provided and they haven't been notified yet
+                    notification_key = f"{user_uuid}_{frame_number // 100}"
+                    
+                    if user_email and notification_key not in notified_users:
+                        # Send email with the image URL
+                        email_sent = send_email_alert(
+                            user_email=user_email,
+                            frame_number=frame_number,
+                            timestamp=timestamp,
+                            user_uuid=user_uuid,
+                            image_url=public_url
+                        )
+                        
+                        if email_sent:
+                            notified_users.add(notification_key)
+                            response_data["email_alert"] = "sent"
+                        else:
+                            response_data["email_alert"] = "failed"
+                    elif notification_key in notified_users:
+                        response_data["email_alert"] = "already_notified"
+                else:
+                    response_data["supabase_error"] = upload_result["error"]
+                    print(f"Upload failed: {upload_result['error']}")
             
         except Exception as e:
             print(f"Error processing file: {e}")
@@ -127,12 +132,8 @@ async def detect_fire(image_bytes):
         if response.status_code == 200:
             result = response.json()
             
-            # Process the result to find fire detection
-            # This assumes the API returns predictions in a certain format
-            # You may need to adjust based on the actual response structure
             predictions = result.get("predictions", [])
             
-            # Find the highest confidence prediction for fire
             highest_confidence = 0
             for pred in predictions:
                 if pred.get("class") in ["fire", "smoke", "spark"]:  # Adjust class names as needed
@@ -144,9 +145,6 @@ async def detect_fire(image_bytes):
             return fire_detected, highest_confidence
         else:
             print(f"API request failed with status code {response.status_code}: {response.text}")
-            # Fallback to random for testing if API fails
-            fire_detected = random.random() < 0.4
-            confidence_score = random.uniform(0.9, 0.99) if fire_detected else random.uniform(0.1, 0.49)
             return fire_detected, confidence_score
             
     except Exception as e:
