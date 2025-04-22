@@ -1,5 +1,7 @@
 # Firewatch - Real-time Fire Detection and Emergency Response System
 
+HackDavis 2025, April 19 - 20
+
 ## Overview
 
 Firewatch is an autonomous, real-time fire detection and emergency response system built using cutting-edge AI technologies. The system continuously processes video data to detect fire and communicates with emergency services in real-time to assist during critical fire situations.
